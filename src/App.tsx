@@ -284,15 +284,16 @@ const FolderCardContent = ({
 
 // --- Main App ---
 export default function App() {
-  const [, setDimensions] = useState({
-    width: window.innerWidth,
-    height: window.innerHeight,
-  });
+  const [viewportHeight, setViewportHeight] = useState(
+    typeof window !== "undefined" ? window.innerHeight : 900,
+  );
 
   useEffect(() => {
     const handleResize = () => {
-      setDimensions({ width: window.innerWidth, height: window.innerHeight });
+      setViewportHeight(window.innerHeight);
     };
+
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -476,7 +477,7 @@ export default function App() {
 
         <ScrollStack
           useWindowScroll={true}
-          itemDistance={window.innerHeight * 0.8}
+          itemDistance={viewportHeight * 0.8}
           itemStackDistance={30}
           baseScale={0.92}
           itemScale={0.015}

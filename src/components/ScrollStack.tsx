@@ -93,6 +93,37 @@ const ScrollStack: React.FC<ScrollStackProps> = ({
     []
   );
 
+  const measureCards = useCallback(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+
+    const cards = Array.from(
+      (useWindowScroll
+        ? document.querySelectorAll('.scroll-stack-card')
+        : scroller.querySelectorAll('.scroll-stack-card')) as NodeListOf<HTMLElement>
+    );
+
+    cardsRef.current = cards;
+
+    cards.forEach(card => {
+      card.style.transform = '';
+      card.style.filter = '';
+    });
+
+    initialOffsetsRef.current = cards.map(card => getElementOffset(card));
+
+    cards.forEach((card, i) => {
+      if (i < cards.length - 1) {
+        card.style.marginBottom = `${itemDistance}px`;
+      }
+      card.style.willChange = 'transform, filter';
+      card.style.transformOrigin = 'top center';
+      card.style.backfaceVisibility = 'hidden';
+      card.style.transform = 'translate3d(0, 0, 0)';
+      card.style.perspective = '1000px';
+    });
+  }, [getElementOffset, itemDistance, useWindowScroll]);
+
   const updateCardTransforms = useCallback(() => {
     if (!cardsRef.current.length || isUpdatingRef.current) return;
 
@@ -268,47 +299,41 @@ const ScrollStack: React.FC<ScrollStackProps> = ({
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
-
-    const cards = Array.from(
-      (useWindowScroll
-        ? document.querySelectorAll('.scroll-stack-card')
-        : scroller.querySelectorAll('.scroll-stack-card')) as NodeListOf<HTMLElement>
-    );
-
-    cardsRef.current = cards;
-    
-    // Measure initial offsets without transforms
-    cards.forEach(card => {
-      card.style.transform = '';
-      card.style.filter = '';
-    });
-    
-    initialOffsetsRef.current = cards.map(card => getElementOffset(card));
-    
     const transformsCache = lastTransformsRef.current;
+    let remeasureFrameId: number | null = null;
 
-    cards.forEach((card, i) => {
-      if (i < cards.length - 1) {
-        card.style.marginBottom = `${itemDistance}px`;
-      }
-      card.style.willChange = 'transform, filter';
-      card.style.transformOrigin = 'top center';
-      card.style.backfaceVisibility = 'hidden';
-      card.style.transform = 'translate3d(0, 0, 0)';
-      card.style.perspective = '1000px';
-    });
+    measureCards();
 
     setupLenis();
     updateCardTransforms();
 
     const handleResize = () => {
-      initialOffsetsRef.current = cards.map(card => getElementOffset(card));
+      measureCards();
       updateCardTransforms();
     };
+
+    const handleWindowScroll = () => {
+      updateCardTransforms();
+    };
+
+    remeasureFrameId = requestAnimationFrame(() => {
+      measureCards();
+      updateCardTransforms();
+    });
+
     window.addEventListener('resize', handleResize);
+    if (useWindowScroll) {
+      window.addEventListener('scroll', handleWindowScroll, { passive: true });
+    }
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      if (useWindowScroll) {
+        window.removeEventListener('scroll', handleWindowScroll);
+      }
+      if (remeasureFrameId !== null) {
+        cancelAnimationFrame(remeasureFrameId);
+      }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
@@ -331,9 +356,9 @@ const ScrollStack: React.FC<ScrollStackProps> = ({
     blurAmount,
     useWindowScroll,
     onStackComplete,
+    measureCards,
     setupLenis,
-    updateCardTransforms,
-    getElementOffset
+    updateCardTransforms
   ]);
 
   return (
